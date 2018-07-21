@@ -2,13 +2,13 @@
 #define LOGGER_HPP
 
 #include <iostream>
-#include <mutex>
+#include <sstream>
+#include <fstream>
 #include <queue>
 #include <memory>
-#include <sstream>
-#include <thread>
 #include <functional>
-// #include <utility>
+#include <thread>
+#include <mutex>
 #include <condition_variable>
 
 namespace logger
@@ -20,7 +20,6 @@ namespace {
 
 typedef const std::string& CStrRef;
 
-
 template<typename T>
 using UPtr = std::shared_ptr<T>;
 
@@ -29,6 +28,7 @@ inline std::string fileNameFromPath(std::string path)
 {
     return path.substr(path.find_last_of("/\\")+1);
 }
+
 
 std::string getCurrentTimeStamp()
 {
@@ -90,10 +90,15 @@ public:
 
     void setLoggedSeverities(int8_t severities);
 
+    void setGlobalLogFileName(CStrRef logFileName);
+
     EntryCollector log(CStrRef file, uint line, Severity sev);
     EntryCollector slog(CStrRef file, uint line, Severity sev, CStrRef scope);
+    EntryCollector loggf(CStrRef file, uint line, Severity sev);
     EntryCollector logf(CStrRef file, uint line, Severity sev, CStrRef logFile);
+    EntryCollector sloggf(CStrRef file, uint line, Severity sev, CStrRef scope);
     EntryCollector slogf(CStrRef file, uint line, Severity sev, CStrRef scope, CStrRef logFile);
+
 
 private:
     Logger();
@@ -123,11 +128,16 @@ private:
     std::condition_variable m_osQueueCheck;
     std::condition_variable m_ofsQueueCheck;
 
+    std::string m_logFileName;
+
     int8_t m_loggedSeverities;
     std::queue<UPtr<std::ostringstream>> m_OSEntries;
     std::queue<std::pair<std::string, UPtr<std::ostringstream>>> m_OFSEntries;
 };
 
+
+#define SET_GLOBAL_LOG_FILE_NAME(fileName) \
+        Logger::getInstance().setGlobalLogFileName(fileName);
 
 // simple log
 // put message to std::cout
@@ -135,19 +145,37 @@ private:
 #define LOG(severity) \
             Logger::getInstance().log(__FILE__, __LINE__, severity)
 
-// scoped log
+
+// LOG Global File
+// put message to file, that has been set with Logger::setLogFileName
+// [file:line] (severity) message 
+#define LOGGF(severity) \
+        Logger::getInstance().loggf(__FILE__, __LINE__, severity)
+
+
+// Scoped LOG
 // put message to std::cout
 // [file:line] (severity) {scope} message
 #define SLOG(severity, scope) \
         Logger::getInstance().slog(__FILE__, __LINE__, severity, scope)
 
-// simple log
+
+// LOG File
 // put message to file
 // [file:line] (severity) message 
 #define LOGF(severity, fileName) \
         Logger::getInstance().logf(__FILE__, __LINE__, severity, fileName)
 
+
+// Scoped LOG Global File
 // scoped log
+// put message to file, that has been set with Logger::setLogFileName
+// [file:line] (severity) {scope} message
+#define SLOGGF(severity, scope) \
+        Logger::getInstance().sloggf(__FILE__, __LINE__, severity, scope)
+
+
+// Scoped LOG File
 // put message to file
 // [file:line] (severity) {scope} message
 #define SLOGF(severity, scope, fileName) \
@@ -194,8 +222,21 @@ Logger& Logger::getInstance()
 }
 
 
+void Logger::setLoggedSeverities(int8_t severities)
+{
+    m_loggedSeverities = severities;
+}
+
+
+void Logger::setGlobalLogFileName(CStrRef logFileName)
+{
+    m_logFileName = logFileName;
+}
+
+
 Logger::Logger()
     : m_isAlive(true),
+      m_logFileName(""),
       m_loggedSeverities(15) // 1111, debug:info:warning:error
 { 
     m_osThread = std::thread([this]{ this->processOSEntries();});
@@ -232,12 +273,6 @@ void Logger::addEntryToOFSQueue(const std::string& fileName, std::shared_ptr<std
         m_OFSEntries.push(std::make_pair(fileName, entry));
         m_ofsQueueCheck.notify_one();
     }
-}
-
-
-void Logger::setLoggedSeverities(int8_t severities)
-{
-    m_loggedSeverities = severities;
 }
 
 
@@ -302,12 +337,9 @@ EntryCollector Logger::log(CStrRef fileName, uint line, Severity severity)
 
 EntryCollector Logger::slog(CStrRef fileName, uint line, Severity severity, CStrRef scope)
 {
-    auto ec = createEntryCollector(severity, [this](auto entry){ this->addEntryToOSQueue(entry); });
+    auto ec = log(fileName, line, severity);
 
-    ec << '<' << getCurrentTimeStamp() << '>'
-       << '[' << fileNameFromPath(fileName) << ":" << line << ']'
-       << "( " << getStringSeverity(severity) << " )"
-       << "{ " << scope << " } ";
+    ec << "{ " << scope << " } ";
     
     return ec;
 }
@@ -318,6 +350,7 @@ EntryCollector Logger::logf(CStrRef fileName, uint line, Severity severity, CStr
     auto addEntryFunc = [this] (const std::string& logFileName, auto entry) { 
         this->addEntryToOFSQueue(logFileName, entry);
     };
+ 
     auto ec = createEntryCollector(severity, std::bind(addEntryFunc, logFileName, std::placeholders::_1));
 
     ec << '<' << getCurrentTimeStamp() << '>'
@@ -328,22 +361,31 @@ EntryCollector Logger::logf(CStrRef fileName, uint line, Severity severity, CStr
 }
 
 
-EntryCollector Logger::slogf(CStrRef fileName, uint line, Severity severity, CStrRef scope,CStrRef logFileName)
+EntryCollector Logger::loggf(CStrRef fileName, uint line, Severity severity)
 {
+    return logf(fileName, line, severity, m_logFileName);
+}
 
-    auto addEntryFunc = [this] (const std::string& logFileName, auto entry) { 
-        this->addEntryToOFSQueue(logFileName, entry);
-    };
 
-    auto ec = createEntryCollector(severity, std::bind(addEntryFunc, logFileName, std::placeholders::_1));
+EntryCollector Logger::slogf(CStrRef fileName, uint line, Severity severity, CStrRef scope, CStrRef logFileName)
+{
+    auto ec = logf(fileName, line, severity, logFileName);
 
-    ec << '<' << getCurrentTimeStamp() << '>'
-       << '[' << fileNameFromPath(fileName) << ":" << line << ']'
-       << "( " << getStringSeverity(severity) << " )"
-       << "{ " << scope << " } ";
+    ec << "{ " << scope << " } ";
     
     return ec;
 }
+
+
+EntryCollector Logger::sloggf(CStrRef fileName, uint line, Severity severity, CStrRef scope)
+{
+    auto ec = logf(fileName, line, severity, m_logFileName);
+
+    ec << "{ " << scope << " } ";
+    
+    return ec;
+}
+
 
 } // namespace logger
 
