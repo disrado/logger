@@ -14,35 +14,41 @@
 namespace logger
 {
 
-enum Severity { debug = 1, info = 2, warrning = 4, error = 8};
+enum Severity { debug = 1, info = 2, warrning = 4, error = 8 };
 
-namespace {
+namespace
+{
 
 typedef const std::string& CStrRef;
 
 template<typename T>
-using UPtr = std::shared_ptr<T>;
+using ShPtr = std::shared_ptr<T>;
 
+using ForwardEntryFunc = std::function<void(ShPtr<std::ostringstream>)>;
 
 inline std::string fileNameFromPath(std::string path)
 {
-    return path.substr(path.find_last_of("/\\")+1);
+    return path.substr(path.find_last_of("/\\") + 1);
 }
 
 
 std::string getCurrentTimeStamp()
 {
-    auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    std::string strTime = std::ctime(&time);     // std::ctime return string with \n
-    if(!strTime.empty()) //without whit check some times throwing error from erase() (size() == 0)
+    const auto time{ std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) };
+    std::string strTime{ std::ctime(&time) }; // std::ctime return string with \n
+    
+	// without whit check some times throwing error from erase() (size() == 0)
+    if (!strTime.empty()) {
         strTime.erase(strTime.find('\n'), 1);
+    }
+    
     return strTime;
 }
 
 
 std::string getStringSeverity(Severity severity)
 {
-    switch(severity) {
+    switch (severity) {
         case Severity::debug: return "debug";
         case Severity::info: return "info";
         case Severity::warrning: return "warning";
@@ -64,7 +70,7 @@ public:
 private:
     friend Logger;
 
-    EntryCollector(Mode mode = Mode::process, std::function<void(UPtr<std::ostringstream>)> forwardEntry = nullptr);
+    EntryCollector(Mode mode = Mode::process, ForwardEntryFunc forwardEntry = nullptr);
 
     EntryCollector(EntryCollector&&) = default;
     EntryCollector& operator =(EntryCollector&&) = default;
@@ -73,12 +79,12 @@ public:
     ~EntryCollector();
 
     template<typename T>
-    EntryCollector& operator <<(const T& message);
-    EntryCollector& operator <<(std::ostream&(*os)(std::ostream&));
+    EntryCollector& operator<<(const T& message);
+    EntryCollector& operator<<(std::ostream&(*os)(std::ostream&));
 
 private:
-    std::function<void(UPtr<std::ostringstream>)> m_addEntryToQueue;
-    UPtr<std::ostringstream> m_entry;
+    ForwardEntryFunc m_addEntryToQueue;
+    ShPtr<std::ostringstream> m_entry;
     Mode m_mode;
 };
 
@@ -90,7 +96,7 @@ public:
 
     void setLoggedSeverities(int8_t severities);
 
-    void setGlobalLogFileName(CStrRef logFileName);
+    void setGlobalLogFile(CStrRef logFileName);
 
     EntryCollector log(CStrRef file, uint line, Severity sev);
     EntryCollector slog(CStrRef file, uint line, Severity sev, CStrRef scope);
@@ -106,13 +112,13 @@ private:
 
     Logger(Logger&&) = delete;
     Logger(const Logger&) = delete;
-    Logger& operator =(Logger&&) = delete;
-    Logger& operator =(const Logger&) = delete;
+    Logger& operator=(Logger&&) = delete;
+    Logger& operator=(const Logger&) = delete;
 
-    void addEntryToOSQueue(UPtr<std::ostringstream> entry);
-    void addEntryToOFSQueue(const std::string& fileName, UPtr<std::ostringstream> entry);
+    void addEntryToOSQueue(ShPtr<std::ostringstream> entry);
+    void addEntryToOFSQueue(const std::string& fileName, ShPtr<std::ostringstream> entry);
 
-    EntryCollector createEntryCollector(Severity severity, std::function<void(UPtr<std::ostringstream>)> forwardEntry);
+    EntryCollector createEntryCollector(Severity severity, ForwardEntryFunc forwardEntry);
 
     void processOSEntries();
     void processOFSEntries();
@@ -131,13 +137,13 @@ private:
     std::string m_logFileName;
 
     int8_t m_loggedSeverities;
-    std::queue<UPtr<std::ostringstream>> m_OSEntries;
-    std::queue<std::pair<std::string, UPtr<std::ostringstream>>> m_OFSEntries;
+    std::queue<ShPtr<std::ostringstream>> m_OSEntries;
+    std::queue<std::pair<std::string, ShPtr<std::ostringstream>>> m_OFSEntries;
 };
 
 
-#define SET_GLOBAL_LOG_FILE_NAME(fileName) \
-        Logger::getInstance().setGlobalLogFileName(fileName);
+#define SET_GLOBAL_LOG_FILE(fileName) \
+        Logger::getInstance().setGlobalLogFile(fileName);
 
 // simple log
 // put message to std::cout
@@ -182,35 +188,37 @@ private:
         Logger::getInstance().slogf(__FILE__, __LINE__, severity, scope, fileName)
 
 
-EntryCollector::EntryCollector(Mode mode, std::function<void(std::shared_ptr<std::ostringstream>)> forwardEntry)
-    : m_addEntryToQueue(forwardEntry),
-      m_entry(std::make_shared<std::ostringstream>()),
-      m_mode(mode)
+EntryCollector::EntryCollector(Mode mode, ForwardEntryFunc forwardEntry)
+    : m_addEntryToQueue(forwardEntry)
+    , m_entry(std::make_shared<std::ostringstream>())
+    , m_mode(mode)
 { }
 
 
 EntryCollector::~EntryCollector()
 {
-    if(m_mode == Mode::process)
+    if (m_mode == Mode::process) {
         m_addEntryToQueue(m_entry);
+    }
 }
 
 
 template<typename T>
-EntryCollector& EntryCollector::operator <<(const T& message)
+EntryCollector& EntryCollector::operator<<(const T& message)
 {
-    if(m_mode == Mode::process )
+    if (m_mode == Mode::process ) {
         *m_entry << message;
-    
+    }
+
     return *this;
 }
 
 
 EntryCollector& EntryCollector::operator <<(std::ostream&(*os)(std::ostream&))
 {
-    if(m_mode == Mode::process )
+    if(m_mode == Mode::process ) {
         *m_entry << os;
-    
+	}
     return *this;
 }
 
@@ -228,16 +236,16 @@ void Logger::setLoggedSeverities(int8_t severities)
 }
 
 
-void Logger::setGlobalLogFileName(CStrRef logFileName)
+void Logger::setGlobalLogFile(CStrRef logFileName)
 {
     m_logFileName = logFileName;
 }
 
 
 Logger::Logger()
-    : m_isAlive(true),
-      m_logFileName(""),
-      m_loggedSeverities(15) // 1111, debug:info:warning:error
+    : m_isAlive(true)
+    , m_logFileName("")
+    , m_loggedSeverities(15) // 1111, debug:info:warning:error
 { 
     m_osThread = std::thread([this]{ this->processOSEntries();});
     m_ofsThread = std::thread([this]{ this->processOFSEntries();});
@@ -256,47 +264,43 @@ Logger::~Logger()
 }
 
 
-void Logger::addEntryToOSQueue(std::shared_ptr<std::ostringstream> entry)
+void Logger::addEntryToOSQueue(ShPtr<std::ostringstream> entry)
 {
-    std::lock_guard<std::mutex> lg(m_osMtx);
-    {
+    { const std::lock_guard<std::mutex> lg(m_osMtx);
         m_OSEntries.push(entry);
         m_osQueueCheck.notify_one();
     }
 }
 
 
-void Logger::addEntryToOFSQueue(const std::string& fileName, std::shared_ptr<std::ostringstream> entry)
+void Logger::addEntryToOFSQueue(const std::string& fileName, ShPtr<std::ostringstream> entry)
 {
-    std::lock_guard<std::mutex> lg(m_ofsMtx);
-    {
+    { const std::lock_guard<std::mutex> lg(m_ofsMtx);
         m_OFSEntries.push(std::make_pair(fileName, entry));
         m_ofsQueueCheck.notify_one();
     }
 }
 
 
-EntryCollector Logger::createEntryCollector(Severity severity, 
-                                            std::function<void(std::shared_ptr<std::ostringstream>)> forwardEntry)
+EntryCollector Logger::createEntryCollector(Severity severity, ForwardEntryFunc forwardEntry)
 {
-    if((m_loggedSeverities & severity) != severity)
+    if ((m_loggedSeverities & severity) != severity) {
         return EntryCollector(EntryCollector::Mode::ignore);
-
+	}
     return EntryCollector(EntryCollector::Mode::process, forwardEntry);
 }
 
 
 void Logger::processOSEntries()
 {
-    while(m_isAlive) {
-        std::unique_lock<std::mutex> locker(m_osMtx);
-        {
-            m_osQueueCheck.wait(locker, [&]{ return !m_OSEntries.empty() || !m_isAlive; });
+    while (m_isAlive) {
+        { std::unique_lock<std::mutex> locker(m_osMtx);
+            m_osQueueCheck.wait(locker, [&] { return !m_OSEntries.empty() || !m_isAlive; });
 
-            while(!m_OSEntries.empty()) {
-                if(m_OSEntries.front())
+            while (!m_OSEntries.empty()) {
+                if (m_OSEntries.front()) {
                     std::cout << m_OSEntries.front()->str();
-
+                }
                 m_OSEntries.pop();
             }
         }
@@ -306,14 +310,16 @@ void Logger::processOSEntries()
 
 void Logger::processOFSEntries()
 {
-    while(m_isAlive) {
-        std::unique_lock<std::mutex> locker(m_ofsMtx);
-        {
-            m_ofsQueueCheck.wait(locker, [&]{ return !m_OFSEntries.empty() || !m_isAlive; });
+    while (m_isAlive) {
+        { std::unique_lock<std::mutex> locker(m_ofsMtx);
+            m_ofsQueueCheck.wait(locker, [&] { return !m_OFSEntries.empty() || !m_isAlive; });
 
-            while(!m_OFSEntries.empty()) {
-                if(m_OFSEntries.front().first != "" && m_OFSEntries.front().second) {
-                    std::ofstream logStream(m_OFSEntries.front().first, std::ios::out | std::ios::app);
+            while (!m_OFSEntries.empty()) {
+                if (m_OFSEntries.front().first != "" && m_OFSEntries.front().second) {
+                    std::ofstream logStream{ 
+						m_OFSEntries.front().first,
+						std::ios::out | std::ios::app };
+						
                     logStream << m_OFSEntries.front().second->str();
                 }
                 m_OFSEntries.pop();
@@ -325,7 +331,9 @@ void Logger::processOFSEntries()
 
 EntryCollector Logger::log(CStrRef fileName, uint line, Severity severity)
 {
-    auto ec = createEntryCollector(severity, [this](auto entry){ this->addEntryToOSQueue(entry); });
+    auto ec{ createEntryCollector(severity, [this] (auto entry) { 
+		this->addEntryToOSQueue(entry); }) 
+	};
     
     ec << '<' << getCurrentTimeStamp() << '>'
        << '[' << fileNameFromPath(fileName) << ":" << line << ']'
@@ -337,7 +345,7 @@ EntryCollector Logger::log(CStrRef fileName, uint line, Severity severity)
 
 EntryCollector Logger::slog(CStrRef fileName, uint line, Severity severity, CStrRef scope)
 {
-    auto ec = log(fileName, line, severity);
+    auto ec{ log(fileName, line, severity) };
 
     ec << "{ " << scope << " } ";
     
@@ -347,11 +355,14 @@ EntryCollector Logger::slog(CStrRef fileName, uint line, Severity severity, CStr
 
 EntryCollector Logger::logf(CStrRef fileName, uint line, Severity severity, CStrRef logFileName)
 {
-    auto addEntryFunc = [this] (const std::string& logFileName, auto entry) { 
+    auto addEntryFunc{ [this] (const std::string& logFileName, auto entry) { 
         this->addEntryToOFSQueue(logFileName, entry);
-    };
+    } };
  
-    auto ec = createEntryCollector(severity, std::bind(addEntryFunc, logFileName, std::placeholders::_1));
+    auto ec{
+		createEntryCollector(
+			severity,
+			std::bind(addEntryFunc, logFileName, std::placeholders::_1)) };
 
     ec << '<' << getCurrentTimeStamp() << '>'
        << '[' << fileNameFromPath(fileName) << ":" << line << ']'
@@ -367,9 +378,14 @@ EntryCollector Logger::loggf(CStrRef fileName, uint line, Severity severity)
 }
 
 
-EntryCollector Logger::slogf(CStrRef fileName, uint line, Severity severity, CStrRef scope, CStrRef logFileName)
+EntryCollector Logger::slogf(
+	CStrRef fileName,
+	uint line,
+	Severity severity,
+	CStrRef scope,
+	CStrRef logFileName)
 {
-    auto ec = logf(fileName, line, severity, logFileName);
+    auto ec{ logf(fileName, line, severity, logFileName) };
 
     ec << "{ " << scope << " } ";
     
@@ -379,7 +395,7 @@ EntryCollector Logger::slogf(CStrRef fileName, uint line, Severity severity, CSt
 
 EntryCollector Logger::sloggf(CStrRef fileName, uint line, Severity severity, CStrRef scope)
 {
-    auto ec = logf(fileName, line, severity, m_logFileName);
+    auto ec{ logf(fileName, line, severity, m_logFileName) };
 
     ec << "{ " << scope << " } ";
     
