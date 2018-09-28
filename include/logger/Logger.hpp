@@ -97,7 +97,7 @@ private:
 class Logger final
 {
 public:
-	static Logger& getInstance();
+	static Logger& Instance();
 
 	void setLoggedSeverities(int8_t severities);
 
@@ -151,34 +151,34 @@ private:
 
 
 #define SET_GLOBAL_LOG_FILE(fileName) \
-		Logger::getInstance().setGlobalLogFile(fileName);
+		Logger::Instance().setGlobalLogFile(fileName);
 
 // simple log
 // put message to std::cout
 // [file:line] (severity) message
 #define LOG(severity) \
-			Logger::getInstance().log(__FILE__, __LINE__, severity)
+			Logger::Instance().log(__FILE__, __LINE__, severity)
 
 
 // LOG Global File
 // put message to file, that has been set with Logger::setLogFileName
 // [file:line] (severity) message 
 #define LOGGF(severity) \
-		Logger::getInstance().loggf(__FILE__, __LINE__, severity)
+		Logger::Instance().loggf(__FILE__, __LINE__, severity)
 
 
 // Scoped LOG
 // put message to std::cout
 // [file:line] (severity) {scope} message
 #define SLOG(severity, scope) \
-		Logger::getInstance().slog(__FILE__, __LINE__, severity, scope)
+		Logger::Instance().slog(__FILE__, __LINE__, severity, scope)
 
 
 // LOG File
 // put message to file
 // [file:line] (severity) message 
 #define LOGF(severity, fileName) \
-		Logger::getInstance().logf(__FILE__, __LINE__, severity, fileName)
+		Logger::Instance().logf(__FILE__, __LINE__, severity, fileName)
 
 
 // Scoped LOG Global File
@@ -186,14 +186,14 @@ private:
 // put message to file, that has been set with Logger::setLogFileName
 // [file:line] (severity) {scope} message
 #define SLOGGF(severity, scope) \
-		Logger::getInstance().sloggf(__FILE__, __LINE__, severity, scope)
+		Logger::Instance().sloggf(__FILE__, __LINE__, severity, scope)
 
 
 // Scoped LOG File
 // put message to file
 // [file:line] (severity) {scope} message
 #define SLOGF(severity, scope, fileName) \
-		Logger::getInstance().slogf(__FILE__, __LINE__, severity, scope, fileName)
+		Logger::Instance().slogf(__FILE__, __LINE__, severity, scope, fileName)
 
 
 } // namespace logger

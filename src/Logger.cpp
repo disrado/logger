@@ -9,12 +9,14 @@ EntryCollector::EntryCollector(Mode mode, ForwardEntryFunc forwardEntry)
 	: m_addEntryToQueue(forwardEntry)
 	, m_entry(std::make_shared<std::ostringstream>())
 	, m_mode(mode)
-{ }
+{
+}
 
 
 EntryCollector::~EntryCollector()
 {
 	if (m_mode == Mode::process) {
+		*m_entry << std::endl;
 		m_addEntryToQueue(m_entry);
 	}
 }
@@ -29,7 +31,7 @@ EntryCollector& EntryCollector::operator<<(std::ostream&(*os)(std::ostream&))
 }
 
 
-Logger& Logger::getInstance()
+Logger& Logger::Instance()
 {
 	static Logger logger;
 	return logger;
