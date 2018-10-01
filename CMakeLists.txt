@@ -11,7 +11,17 @@ add_library(${PROJECT_NAME}
         ${${PROJECT_NAME}_SOURCES}
 )
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_14)
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+
+target_compile_options(${PROJECT_NAME}
+	PRIVATE
+		$<$<CXX_COMPILER_ID:MSVC>:
+			/MP /W3 /Zf
+			$<$<CONFIG:Debug>:/MTd>
+			$<$<CONFIG:Release>:/MT>>
+		$<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:
+			-Wall -Wextra -Werror -Wpedantic -pedantic-errors -pipe -pthread -fPIC>
+)
 
 target_include_directories(${PROJECT_NAME}
     PUBLIC

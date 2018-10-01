@@ -15,7 +15,13 @@ namespace lg
 {
 
 
-enum Severity { debug = 1, info = 2, warrning = 4, error = 8 };
+enum Severity : uint8_t
+{ 
+	debug = 1,
+	error = 2,
+	info = 4,
+	warning = 8,
+};
 
 
 namespace
@@ -28,38 +34,6 @@ template<typename T>
 using ShPtr = std::shared_ptr<T>;
 
 using ForwardEntryFunc = std::function<void(ShPtr<std::ostringstream>)>;
-
-
-inline std::string fileNameFromPath(std::string path)
-{
-	return path.substr(path.find_last_of("/\\") + 1);
-}
-
-
-std::string getCurrentTimeStamp()
-{
-	const auto time{ std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) };
-	std::string strTime{ std::ctime(&time) }; // std::ctime return string with \n
-	
-	// without whit check some times throwing error from erase() (size() == 0)
-	if (!strTime.empty()) {
-		strTime.erase(strTime.find('\n'), 1);
-	}
-	
-	return strTime;
-}
-
-
-std::string getStringSeverity(Severity severity)
-{
-	switch (severity) {
-		case Severity::debug: return "debug";
-		case Severity::info: return "info";
-		case Severity::warrning: return "warning";
-		case Severity::error: return "error";
-		default: return "Unknown severity";
-	}
-}
 
 
 } // namespace
@@ -141,7 +115,7 @@ private:
 
 	std::string m_logFileName;
 
-	int8_t m_loggedSeverities;
+	uint8_t m_loggedSeverities;
 	std::queue<ShPtr<std::ostringstream>> m_OSEntries;
 	std::queue<std::pair<std::string, ShPtr<std::ostringstream>>> m_OFSEntries;
 };
@@ -196,4 +170,4 @@ private:
 		Logger::Instance().slogf(__FILE__, __LINE__, severity, scope, fileName)
 
 
-} // namespace lg
+} // namespace l

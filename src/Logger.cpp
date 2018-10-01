@@ -4,6 +4,44 @@
 namespace lg
 {
 
+namespace
+{
+
+
+inline std::string fileNameFromPath(std::string path)
+{
+	return path.substr(path.find_last_of("/\\") + 1);
+}
+
+
+std::string getCurrentTimeStamp()
+{
+	const auto time{ std::chrono::system_clock::to_time_t(std::chrono::system_clock::now()) };
+	std::string strTime{ std::ctime(&time) }; // std::ctime return string with \n
+	
+	// Without this check some times throwing error from erase() (size() == 0).
+	if (!strTime.empty()) {
+		strTime.erase(strTime.find('\n'), 1);
+	}
+	
+	return strTime;
+}
+
+
+std::string getStringSeverity(Severity severity)
+{
+	switch (severity) {
+		case Severity::debug: return "debug";
+		case Severity::error: return "error";
+		case Severity::info: return "info";
+		case Severity::warning: return "warning";
+		default: return "Unknown severity";
+	}
+}
+
+
+}	// namespace
+
 
 EntryCollector::EntryCollector(Mode mode, ForwardEntryFunc forwardEntry)
 	: m_addEntryToQueue(forwardEntry)
@@ -74,7 +112,7 @@ Logger::~Logger()
 
 void Logger::addEntryToOSQueue(ShPtr<std::ostringstream> entry)
 {
-	{ const std::lock_guard<std::mutex> lg(m_osMtx);
+	{ const std::lock_guard lg(m_osMtx);
 		m_OSEntries.push(entry);
 		m_osQueueCheck.notify_one();
 	}
@@ -83,7 +121,7 @@ void Logger::addEntryToOSQueue(ShPtr<std::ostringstream> entry)
 
 void Logger::addEntryToOFSQueue(const std::string& fileName, ShPtr<std::ostringstream> entry)
 {
-	{ const std::lock_guard<std::mutex> lg(m_ofsMtx);
+	{ const std::lock_guard lg(m_ofsMtx);
 		m_OFSEntries.push(std::make_pair(fileName, entry));
 		m_ofsQueueCheck.notify_one();
 	}
@@ -163,14 +201,10 @@ EntryCollector Logger::slog(CStrRef fileName, uint line, Severity severity, CStr
 
 EntryCollector Logger::logf(CStrRef fileName, uint line, Severity severity, CStrRef logFileName)
 {
-	auto addEntryFunc{ [this] (const std::string& logFileName, auto entry) { 
-		this->addEntryToOFSQueue(logFileName, entry);
-	} };
- 
-	auto ec{
-		createEntryCollector(
-			severity,
-			std::bind(addEntryFunc, logFileName, std::placeholders::_1)) };
+	auto ec{ createEntryCollector(severity, [this, &logFileName] (auto entry) {
+				this->addEntryToOFSQueue(logFileName, entry);
+			})
+	};
 
 	ec << '<' << getCurrentTimeStamp() << '>'
 	   << '[' << fileNameFromPath(fileName) << ":" << line << ']'
