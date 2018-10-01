@@ -11,7 +11,7 @@
 #include <condition_variable>
 
 
-namespace logger
+namespace lg
 {
 
 
@@ -196,4 +196,4 @@ private:
 		Logger::Instance().slogf(__FILE__, __LINE__, severity, scope, fileName)
 
 
-} // namespace logger
+} // namespace lg

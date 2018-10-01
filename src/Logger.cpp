@@ -1,7 +1,7 @@
 #include "logger/Logger.hpp"
 
 
-namespace logger
+namespace lg
 {
 
 
@@ -211,4 +211,4 @@ EntryCollector Logger::sloggf(CStrRef fileName, uint line, Severity severity, CS
 }
 
 
-} // namespace logger
+} // namespace lg
